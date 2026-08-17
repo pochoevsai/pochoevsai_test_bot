@@ -122,52 +122,34 @@ async def cmd_debug(message: Message):
     nm = 852506329
     results = [f"🔬 Debug article {nm}:"]
 
-    # Test basket
     name = await _fetch_name_from_basket(nm)
     results.append(f"Basket name: {name or 'NONE'}")
 
-    # Test card.wb.ru
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
         "Accept": "application/json",
         "Origin": "https://www.wildberries.ru",
         "Referer": "https://www.wildberries.ru/",
     }
-    for dest in ["-1257786", "-1255546"]:
-        try:
-            async with aiohttp.ClientSession() as s:
-                async with s.get(
-                    "https://card.wb.ru/cards/v2/detail",
-                    params={"appType": "1", "curr": "rub", "dest": dest, "nm": str(nm)},
-                    headers=headers, ssl=False, timeout=aiohttp.ClientTimeout(total=8)
-                ) as r:
-                    results.append(f"card.wb.ru dest={dest}: {r.status}")
-                    if r.status == 200:
-                        data = await r.json(content_type=None)
-                        prods = data.get("data", {}).get("products", [])
-                        results.append(f"  products: {len(prods)}")
-        except Exception as e:
-            results.append(f"card.wb.ru {dest}: ERROR {str(e)[:50]}")
-
-    # Test search.wb.ru
-    for key, val in [("nm", str(nm)), ("query", str(nm))]:
-        try:
-            params = {"appType": "1", "curr": "rub", "dest": "-1257786", key: val, "resultset": "catalog"}
-            async with aiohttp.ClientSession() as s:
-                async with s.get(
-                    "https://search.wb.ru/exactmatch/ru/common/v5/search",
-                    params=params, headers=headers, ssl=False, timeout=aiohttp.ClientTimeout(total=8)
-                ) as r:
-                    results.append(f"search ({key}): {r.status}")
-                    if r.status == 200:
-                        data = await r.json(content_type=None)
-                        prods = data.get("data", {}).get("products", [])
-                        results.append(f"  products: {len(prods)}")
-                        if prods:
-                            p = prods[0]
-                            results.append(f"  id={p.get('id')} salePriceU={p.get('salePriceU')}")
-        except Exception as e:
-            results.append(f"search ({key}): ERROR {str(e)[:50]}")
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(
+                "https://card.wb.ru/cards/v4/detail",
+                params={"appType": "1", "curr": "rub", "dest": "1259570991", "spp": "30", "nm": str(nm)},
+                headers=headers, ssl=False, timeout=aiohttp.ClientTimeout(total=8)
+            ) as r:
+                results.append(f"card.wb.ru/v4: {r.status}")
+                if r.status == 200:
+                    data = await r.json(content_type=None)
+                    prods = data.get("products", [])
+                    results.append(f"  products: {len(prods)}")
+                    if prods:
+                        p = prods[0]
+                        sizes = p.get("sizes", [])
+                        price = sizes[0].get("price", {}).get("product") if sizes else None
+                        results.append(f"  price.product={price} → {price//100 if price else 'N/A'} ₽")
+    except Exception as e:
+        results.append(f"card.wb.ru/v4: ERROR {str(e)[:80]}")
 
     await message.answer("\n".join(results))
 

@@ -6,7 +6,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-WB_CARD_API = "https://card.wb.ru/cards/v2/detail"
+WB_CARD_API = "https://card.wb.ru/cards/v4/detail"
 WB_SEARCH_API = "https://search.wb.ru/exactmatch/ru/common/v5/search"
 
 BROWSER_HEADERS = {
@@ -24,8 +24,6 @@ BROWSER_HEADERS = {
     "Sec-Fetch-Site": "cross-site",
     "Connection": "keep-alive",
 }
-
-DEST_LIST = ["-1257786", "-1255546", "-2133462", "-1123654"]
 
 
 def extract_article(url_or_article: str) -> Optional[int]:
@@ -73,11 +71,13 @@ async def _fetch_name_from_basket(nm: int) -> Optional[str]:
 
 
 def _extract_price(product: dict) -> Optional[int]:
+    # v4 API: price is in sizes[i].price.product (in kopecks)
     for size in product.get("sizes", []):
         p = size.get("price", {})
         sale = p.get("product") or p.get("sale") or p.get("basic")
-        if sale:
+        if sale and sale > 0:
             return sale // 100
+    # Fallback for older API format
     if product.get("salePriceU"):
         return product["salePriceU"] // 100
     if product.get("priceU"):
@@ -86,26 +86,25 @@ def _extract_price(product: dict) -> Optional[int]:
 
 
 async def _fetch_price_card_api(nm: int) -> Optional[int]:
-    for dest in DEST_LIST:
-        params = {"appType": "1", "curr": "rub", "dest": dest, "nm": str(nm)}
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    WB_CARD_API,
-                    params=params,
-                    headers=BROWSER_HEADERS,
-                    timeout=aiohttp.ClientTimeout(total=10),
-                    ssl=False,
-                ) as resp:
-                    logger.info(f"card.wb.ru status for {nm}: {resp.status}")
-                    if resp.status == 200:
-                        data = await resp.json(content_type=None)
-                        products = data.get("data", {}).get("products", [])
-                        if products:
-                            return _extract_price(products[0])
-        except Exception as e:
-            logger.warning(f"card.wb.ru error for {nm}: {e}")
-        await asyncio.sleep(0.3)
+    # v4 endpoint works without cookies, dest=1259570991 is the current Moscow dest
+    params = {"appType": "1", "curr": "rub", "dest": "1259570991", "spp": "30", "nm": str(nm)}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                WB_CARD_API,
+                params=params,
+                headers=BROWSER_HEADERS,
+                timeout=aiohttp.ClientTimeout(total=10),
+                ssl=False,
+            ) as resp:
+                logger.info(f"card.wb.ru/v4 status for {nm}: {resp.status}")
+                if resp.status == 200:
+                    data = await resp.json(content_type=None)
+                    products = data.get("products", [])
+                    if products:
+                        return _extract_price(products[0])
+    except Exception as e:
+        logger.warning(f"card.wb.ru/v4 error for {nm}: {e}")
     return None
 
 
