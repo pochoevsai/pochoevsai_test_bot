@@ -99,3 +99,13 @@ async def update_price(item_id: int, new_price: int):
             (new_price, item_id),
         )
         await db.commit()
+
+
+async def set_premium(user_id: int, value: bool):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO users (user_id, is_premium) VALUES (?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET is_premium = excluded.is_premium",
+            (user_id, int(value)),
+        )
+        await db.commit()
