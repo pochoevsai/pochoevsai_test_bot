@@ -145,6 +145,10 @@ async def _fetch_price_search_api(nm: int) -> Optional[int]:
 
 
 async def fetch_product(article: int) -> Optional[dict]:
+    """
+    Returns dict with price=None if product exists but price unavailable.
+    Returns None only if article doesn't exist at all.
+    """
     name_task = _fetch_name_from_basket(article)
     price_task = _fetch_price_card_api(article)
     name, price = await asyncio.gather(name_task, price_task)
@@ -154,17 +158,16 @@ async def fetch_product(article: int) -> Optional[dict]:
         await asyncio.sleep(1)
         price = await _fetch_price_search_api(article)
 
-    if not name and not price:
-        logger.warning(f"fetch_product: nothing found for article {article}")
+    if not name:
+        logger.warning(f"fetch_product: article {article} not found in basket CDN")
         return None
 
-    if not price:
-        logger.warning(f"fetch_product: name found but no price for {article}")
-        return None
+    if price is None:
+        logger.warning(f"fetch_product: article {article} found (name OK) but price unavailable")
 
     return {
-        "name": name or f"Товар {article}",
-        "price": price,
+        "name": name,
+        "price": price,  # may be None
         "url": build_wb_url(article),
         "article": article,
     }

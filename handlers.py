@@ -81,7 +81,10 @@ async def process_url(message: Message, state: FSMContext):
     product = await fetch_product(article)
 
     if not product:
-        await msg.edit_text("❌ Товар не найден или недоступен. Проверь ссылку.")
+        await msg.edit_text(
+            "❌ Товар не найден. Проверь артикул — возможно товар снят с продажи.\n\n"
+            "Пример ссылки: https://www.wildberries.ru/catalog/12345678/detail.aspx"
+        )
         return
 
     added = await db.add_item(
@@ -96,13 +99,22 @@ async def process_url(message: Message, state: FSMContext):
         await msg.edit_text("ℹ️ Этот товар уже отслеживается.")
         return
 
-    await msg.edit_text(
-        f"✅ <b>Добавлено!</b>\n\n"
-        f"🛍 {product['name']}\n"
-        f"💰 Текущая цена: <b>{product['price']:,} ₽</b>\n\n"
-        f"Уведомлю как только цена изменится.",
-        parse_mode="HTML",
-    )
+    if product["price"]:
+        await msg.edit_text(
+            f"✅ <b>Добавлено!</b>\n\n"
+            f"🛍 {product['name']}\n"
+            f"💰 Текущая цена: <b>{product['price']:,} ₽</b>\n\n"
+            f"Уведомлю как только цена снизится.",
+            parse_mode="HTML",
+        )
+    else:
+        await msg.edit_text(
+            f"✅ <b>Добавлено в отслеживание!</b>\n\n"
+            f"🛍 {product['name']}\n"
+            f"⏳ Цена будет получена при первой проверке (каждый час)\n\n"
+            f"Уведомлю как только цена снизится.",
+            parse_mode="HTML",
+        )
 
 
 @router.message(Command("debug"))

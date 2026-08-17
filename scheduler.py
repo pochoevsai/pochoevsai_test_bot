@@ -19,13 +19,17 @@ async def check_prices(bot: Bot):
     for item in items:
         try:
             product = await fetch_product(item["article"])
-            if not product:
+            if not product or product["price"] is None:
                 continue
 
             new_price = product["price"]
             old_price = item["last_price"]
 
-            if old_price and new_price < old_price:
+            if old_price is None:
+                # First successful price fetch — just save it, no notification
+                await db.update_price(item["id"], new_price)
+                logger.info(f"Первая цена для article={item['article']}: {new_price} ₽")
+            elif new_price < old_price:
                 diff = old_price - new_price
                 pct = round(diff / old_price * 100)
 
@@ -46,8 +50,8 @@ async def check_prices(bot: Bot):
                     disable_web_page_preview=False,
                 )
                 logger.info(f"Уведомление отправлено user={item['user_id']} article={item['article']}")
-
-            if old_price != new_price:
+                await db.update_price(item["id"], new_price)
+            elif new_price != old_price:
                 await db.update_price(item["id"], new_price)
 
             await asyncio.sleep(0.5)

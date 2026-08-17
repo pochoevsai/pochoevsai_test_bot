@@ -51,7 +51,7 @@ async def count_user_items(user_id: int) -> int:
             return row[0]
 
 
-async def add_item(user_id: int, article: int, name: str, price: int, wb_url: str) -> bool:
+async def add_item(user_id: int, article: int, name: str, price: Optional[int], wb_url: str) -> bool:
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
