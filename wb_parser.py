@@ -3,6 +3,7 @@ import asyncio
 import logging
 import re
 from typing import Optional
+from curl_cffi.requests import AsyncSession as CurlSession
 
 logger = logging.getLogger(__name__)
 
@@ -86,23 +87,22 @@ def _extract_price(product: dict) -> Optional[int]:
 
 
 async def _fetch_price_card_api(nm: int) -> Optional[int]:
-    # v4 endpoint works without cookies, dest=1259570991 is the current Moscow dest
+    # curl_cffi impersonates Chrome TLS — bypasses WB's TLS fingerprint block
     params = {"appType": "1", "curr": "rub", "dest": "1259570991", "spp": "30", "nm": str(nm)}
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
+        async with CurlSession(impersonate="chrome110") as session:
+            resp = await session.get(
                 WB_CARD_API,
                 params=params,
                 headers=BROWSER_HEADERS,
-                timeout=aiohttp.ClientTimeout(total=10),
-                ssl=False,
-            ) as resp:
-                logger.info(f"card.wb.ru/v4 status for {nm}: {resp.status}")
-                if resp.status == 200:
-                    data = await resp.json(content_type=None)
-                    products = data.get("products", [])
-                    if products:
-                        return _extract_price(products[0])
+                timeout=10,
+            )
+            logger.info(f"card.wb.ru/v4 status for {nm}: {resp.status_code}")
+            if resp.status_code == 200:
+                data = resp.json()
+                products = data.get("products", [])
+                if products:
+                    return _extract_price(products[0])
     except Exception as e:
         logger.warning(f"card.wb.ru/v4 error for {nm}: {e}")
     return None
