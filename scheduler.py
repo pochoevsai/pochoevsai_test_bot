@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import database as db
 from wb_parser import fetch_product
-from admitad import make_affiliate_link
+from epn import make_affiliate_link
 from config import CHECK_INTERVAL_MINUTES
 
 logger = logging.getLogger(__name__)
